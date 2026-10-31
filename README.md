@@ -77,6 +77,17 @@ on your system, follow the steps below for a one-time bind to WSL:
         - Attach it to WSL `usbipd attach --wsl --busid <BUSID>`
         - Verify that it exists in WSL (move to a WSL terminal) `ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null`
 
+## Set up with Windows
+
+This repo has been mostly developed in Linux, meaning it's implementation in Windows is a little tricky. I've decided to start developing a little more in Windows to test the new microphone array we have, the UMA-8 miniDSP microphone array. To set up this repo, follow these instructions:
+1. Download the [Git Bash terminal for windows](https://git-scm.com/install/windows). Its configuration should be straight forward.
+2. Navigate to `windows_streaming\audio_stream` or whatever sub directory of `windows_streaming\` you want to use. 
+3. Since this section of the repo uses python, we will install python3 and the pip installer. Install python3 with the windows download and run `py -m pip --version` to ensure the pip installer works. 
+4. Install a virtual environment `python3 -m venv .venv`.
+5. Activate the virtual environment `.\.venv\Scripts\Activate.ps1`. This step may require that you change the ExecutionPolicy of your computer. Change this by running `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force`.
+6. Run `py -m pip install -r .\requirements.txt`. `requirements.txt` holds the necessary modules that the specific subdirectory needs. Without these, the py scripts will not run correctly. 
+7. You can now run the scripts successfully! Once done, make sure to run `deactivate` to deactivate the virtual environment. 
+
 ## Changelog
 
 - 1/13/2026 Arduino MKR WiFi 1010 was received
@@ -101,3 +112,5 @@ on your system, follow the steps below for a one-time bind to WSL:
 - 7/28/2026 Migrated to platformIO and updated git repo
 - 8/4/2026: Updated I2S config for deprecated libraries
 - 8/4/2026: Added script for binding devices to platformio running in WSL
+- 10/30/2026: Configure new directory for beamform testing and audio streaming
+- 10/31/2026: Add instructions for `audio_streaming` use
