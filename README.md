@@ -94,7 +94,7 @@ These are the instructions to run a demo using the `demo.py` script and the UMA-
 1. Make sure to install the necessary drivers for the microphone array (ask Sam about this). 
 2. Connect the microphone array to your computer. 
 3. Connect over-the-ear headphones to your computer via Bluetooth
-4. Navigate to `windows_streaming/audio_stream` and execute the command `py ./demo.py --list` and note the number associated with each audio device. Some devices are input and some are output. Find your bluetooth device (it is usually indicated by the < arrow) and note the number associated with it. Similarly, find the UMA-8 microphone array and it's corresponding id. The microphone will have a description like this: Line (miniDSP micArray Multi-ch, MME (8 in, 0 out))
+4. Navigate to `windows_streaming/audio_stream` and execute the command `py ./demo.py --list` and note the number on the left associated with each audio device. Some devices are input and some are output. Find your bluetooth device (it is usually indicated by the < arrow) and note the number on the left associated with it. Similarly, find the UMA-8 microphone array and it's corresponding id. The microphone will have a description like this: Line (miniDSP micArray Multi-ch, MME (8 in, 0 out))
 5. Once noting those device ids, run the following command to do the demo: `py .\demo.py --in-device-id <MICROPHONE_ARRAY_ID> --out-device-id <BLUETOOTH_DEVICE_ID> --method superdirective`
 6. Done! Point the microphone array in the direction of the person you want to hear.
 
