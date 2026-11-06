@@ -2,3 +2,4 @@ asyncio
 websockets
 sounddevice
 numpy
+argparse
