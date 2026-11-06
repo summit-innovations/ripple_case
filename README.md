@@ -83,10 +83,20 @@ This repo has been mostly developed in Linux, meaning it's implementation in Win
 1. Download the [Git Bash terminal for windows](https://git-scm.com/install/windows). Its configuration should be straight forward.
 2. Navigate to `windows_streaming\audio_stream` or whatever sub directory of `windows_streaming\` you want to use. 
 3. Since this section of the repo uses python, we will install python3 and the pip installer. Install python3 with the windows download and run `py -m pip --version` to ensure the pip installer works. 
-4. Install a virtual environment `python3 -m venv .venv`.
+4. Install a virtual environment `py -m venv .venv`.
 5. Activate the virtual environment `.\.venv\Scripts\Activate.ps1`. This step may require that you change the ExecutionPolicy of your computer. Change this by running `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force`.
 6. Run `py -m pip install -r .\requirements.txt`. `requirements.txt` holds the necessary modules that the specific subdirectory needs. Without these, the py scripts will not run correctly. 
 7. You can now run the scripts successfully! Once done, make sure to run `deactivate` to deactivate the virtual environment. 
+
+## Run demo
+These are the instructions to run a demo using the `demo.py` script and the UMA-8 miniDSP microphone array. 
+
+1. Make sure to install the necessary drivers for the microphone array (ask Sam about this). 
+2. Connect the microphone array to your computer. 
+3. Connect over-the-ear headphones to your computer via Bluetooth
+4. Navigate to `windows_streaming/audio_stream` and execute the command `py ./demo.py --list` and note the number associated with each audio device. Some devices are input and some are output. Find your bluetooth device (it is usually indicated by the < arrow) and note the number associated with it. Similarly, find the UMA-8 microphone array and it's corresponding id. The microphone will have a description like this: Line (miniDSP micArray Multi-ch, MME (8 in, 0 out))
+5. Once noting those device ids, run the following command to do the demo: `py .\demo.py --in-device-id <MICROPHONE_ARRAY_ID> --out-device-id <BLUETOOTH_DEVICE_ID> --method superdirective`
+6. Done! Point the microphone array in the direction of the person you want to hear.
 
 ## Changelog
 
@@ -114,3 +124,4 @@ This repo has been mostly developed in Linux, meaning it's implementation in Win
 - 8/4/2026: Added script for binding devices to platformio running in WSL
 - 10/30/2026: Configure new directory for beamform testing and audio streaming
 - 10/31/2026: Add instructions for `audio_streaming` use
+- 11/6/2026: Add `demo.py` for beamforming demo
