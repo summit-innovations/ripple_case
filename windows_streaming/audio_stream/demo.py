@@ -32,6 +32,7 @@ LOOK_AZIMUTH_DEG = 0.0               # beam direction; 0 = front (+x)
 SPEED_OF_SOUND = 343.0               # m/s
 DIAGONAL_LOADING = 0.05              # higher = less hiss, wider beam
 OUTPUT_GAIN = 8.0                    # RAW mode has no digital gain, so boost here
+GAIN_SHIFT_BITS = 1                  # extra boost: each bit doubles the level (+6 dB)
 
 statuses = []
 beamformer = None
@@ -141,7 +142,7 @@ def audio_callback(indata, outdata, frames, time_info, status):
 
     # Ripple DSP: beamform the 7 mic channels (spare channel dropped).
     mics = indata[:, beamformer.channels]
-    beam = beamformer.process(mics) * OUTPUT_GAIN
+    beam = beamformer.process(mics) * beamformer.gain
     np.clip(beam, -1.0, 1.0, out=beam)
     outdata[:] = beam[:, None]        # same mono beam to both headphone channels
 
@@ -166,7 +167,7 @@ def show_levels(in_device_id):
         print("\nStopped.")
 
 
-def main(in_device_id, out_device_id, method):
+def main(in_device_id, out_device_id, method, gain_shift):
     global beamformer
 
     try:
@@ -196,8 +197,11 @@ def main(in_device_id, out_device_id, method):
     weights = design_weights(positions, LOOK_AZIMUTH_DEG, method, 2 * BLOCK_SIZE)
     beamformer = StreamingBeamformer(weights, BLOCK_SIZE)
     beamformer.channels = channels
+    # Multiplying a float by 2**n is exact: the float equivalent of a left shift by n bits.
+    beamformer.gain = np.float32(OUTPUT_GAIN * 2.0 ** gain_shift)
 
     print(f"\nStarting {method} beamformer (7 mics -> headphones).")
+    print(f"Output gain: x{beamformer.gain:g} ({20 * np.log10(beamformer.gain):.1f} dB)")
     print("Press Ctrl+C to stop.")
 
     try:
@@ -230,6 +234,8 @@ if __name__ == "__main__":
     p.add_argument("--out-device-id", help="output device number or ID")
     p.add_argument("--method", choices=["superdirective", "das"], default="superdirective",
                    help="beamformer design (default: superdirective)")
+    p.add_argument("--gain-shift", type=int, default=GAIN_SHIFT_BITS,
+                   help=f"boost by N bits, +6 dB each; negative is quieter (default: {GAIN_SHIFT_BITS})")
     p.add_argument("--levels", action="store_true",
                    help="show live per-channel input levels and exit")
     p.add_argument("--pattern", action="store_true",
@@ -248,5 +254,5 @@ if __name__ == "__main__":
         show_levels(device_arg(args.in_device_id))
         sys.exit()
 
-    main(device_arg(args.in_device_id), device_arg(args.out_device_id), args.method)
-    
+    main(device_arg(args.in_device_id), device_arg(args.out_device_id), args.method,
+         args.gain_shift)
