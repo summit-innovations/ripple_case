@@ -5,69 +5,9 @@
 % =============================================================================
 \documentclass[11pt]{article}
 
-\usepackage[margin=1in]{geometry}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage{microtype}
-\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
-\usepackage{booktabs,array}
-\usepackage{xcolor}
-\usepackage{listings}
-\usepackage{caption,subcaption}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,calc,positioning,decorations.pathreplacing,angles,quotes}
-\usepackage{pgfplots}
-\pgfplotsset{compat=1.18}
-\usepgfplotslibrary{polar}
-\usepackage[most]{tcolorbox}
-\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
-
-% ---------- theorem-like environments ----------------------------------------
-\theoremstyle{plain}
-\newtheorem{proposition}{Proposition}[section]
-\theoremstyle{definition}
-\newtheorem{definition}[proposition]{Definition}
-\theoremstyle{remark}
-\newtheorem{remark}[proposition]{Remark}
-
-% ---------- design-rationale box ---------------------------------------------
-\newtcolorbox{rationale}[1][]{breakable, enhanced, colback=orange!4, colframe=orange!60!black,
-  boxrule=0.6pt, arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
-  title={Design rationale#1}, fonttitle=\bfseries\small, coltitle=black, colbacktitle=orange!15}
-\newtcolorbox{intuition}{breakable, enhanced, colback=blue!3, colframe=blue!50!black,
-  boxrule=0.6pt, arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
-  title={Intuition}, fonttitle=\bfseries\small, coltitle=black, colbacktitle=blue!10}
-
-% ---------- notation ---------------------------------------------------------
-\newcommand{\herm}{^{\mathsf H}}
-\newcommand{\tr}{^{\mathsf T}}
-\newcommand{\vw}{\mathbf{w}}
-\newcommand{\vd}{\mathbf{d}}
-\newcommand{\vx}{\mathbf{X}}
-\newcommand{\vn}{\mathbf{V}}
-\newcommand{\vp}{\mathbf{p}}
-\newcommand{\vu}{\mathbf{u}}
-\newcommand{\one}{\mathbf{1}}
-\newcommand{\mI}{\mathbf{I}}
-\newcommand{\G}{\bm{\Gamma}}
-\newcommand{\Gmu}{\bm{\Gamma}_{\!\mu}}
-\newcommand{\E}{\mathbb{E}}
-\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
-\newcommand{\WNG}{\mathrm{WNG}}
-\newcommand{\DI}{\mathrm{DI}}
-
-% ---------- code listings ----------------------------------------------------
-\lstset{language=Python, basicstyle=\ttfamily\footnotesize, numbers=left,
-  numberstyle=\tiny\color{gray}, numbersep=6pt, keywordstyle=\color{blue!70!black},
-  commentstyle=\color{green!40!black}, stringstyle=\color{red!60!black},
-  frame=single, rulecolor=\color{gray!50}, framexleftmargin=2pt, xleftmargin=12pt,
-  breaklines=true, columns=fullflexible, keepspaces=true, showstringspaces=false}
-\newcommand{\demolines}[2]{\lstinputlisting[firstline=#1,lastline=#2,firstnumber=#1]{demo.py}}
-
-% ---------- figure styles ----------------------------------------------------
-\tikzset{arr/.style={-{Stealth[length=2.2mm]}, thick}}
-\definecolor{sdcol}{RGB}{200,70,30}
-\definecolor{dascol}{RGB}{40,90,170}
+% Shared packages, boxes and notation (also used by beamformer_background.tex)
+\input{beamformer_preamble}
+\newcommand{\glsloc}[1]{\ \textit{(\S\ref{#1})}}
 
 \title{\textbf{The Mathematics of \texttt{demo.py}}\\[4pt]
 \large A 7-microphone superdirective beamformer, streamed through an overlap-add STFT}
@@ -89,18 +29,54 @@ behind the parameter choices. All plotted numbers were computed from the code it
 \texttt{python demo.py --pattern} prints.
 \end{abstract}
 
+\section*{How to read this document}
+\addcontentsline{toc}{section}{How to read this document}
+
+\paragraph{Before you start.} This document assumes you know what sound waves, decibels, complex
+numbers (phasors), the FFT and complex-valued vectors are. If any of those are new to you, read the
+companion document \emph{Background for The Mathematics of \texttt{demo.py}}
+(\texttt{beamformer\_background.pdf}) first. It needs only Calculus~I and introductory linear
+algebra, and every section of it ends by pointing back to the section of this document where the
+idea is used.
+
+\paragraph{Reading path.} Each section is built from the same coloured pieces, and you can choose
+how deep to go:
+\begin{itemize}[nosep]
+\item \textcolor{blue!50!black}{\textbf{Intuition}} and \textcolor{green!40!black}{\textbf{In plain
+  words}} boxes give the idea without equations. Reading only these, the figures and the
+  \textbf{Key takeaways} at the end of each section gives you the whole story.
+\item The main text gives the equations and the key results (\emph{Propositions}). The proofs of
+  those results are in Appendix~\ref{app:proofs}, so you can skip them on a first read.
+\item \textbf{Code map} paragraphs and the listings connect each equation to the exact lines of
+  \texttt{demo.py}.
+\item \textcolor{orange!60!black}{\textbf{Design rationale}} boxes explain why each number in the
+  code was chosen.
+\end{itemize}
+Words in \textbf{bold blue} link to the Glossary (Appendix~\ref{app:glossary}). All symbols are
+collected in Table~\ref{tab:notation} and Appendix~\ref{app:symbols}.
+
 \tableofcontents
 
 % =============================================================================
 \section{Overview}\label{sec:overview}
 % =============================================================================
 
-Sound from a talker in front of the array reaches the seven microphones at slightly
-different times. The pattern of delays depends only on the direction the sound comes from.
-In the frequency domain each delay becomes a phase rotation. So at every frequency,
-``listening in a direction'' means choosing seven complex weights that make the phasors
-from the look direction add up exactly, while phasors from other directions partly cancel.
-Figure~\ref{fig:pipeline} shows the complete signal chain.
+A single microphone is \term{omni}{omnidirectional}: it hears the talker in front of it, the
+television behind it and the echo off every wall equally well. \texttt{demo.py} uses seven
+microphones to do better. Sound from a talker in front of the board reaches the seven mics at
+slightly different times, because some mics are a few centimetres closer to the talker than
+others. If we shift each mic's signal in time to undo its head start, the talker's voice lines
+up across all seven copies and adds up strongly. Sound from other directions arrives with a
+\emph{different} pattern of delays, so after the same shifts it does not line up and partly
+cancels. A system that does this is a \term{beamformer}{beamformer}.
+
+The delays involved are a few millionths of a second, smaller than the time between two samples,
+so the program does not shift samples directly. Instead it splits the sound into frequencies with
+an FFT. At each frequency a delay is just a rotation of a \term{phasor}{phasor} (an arrow in the
+complex plane). So at every frequency, ``listening in a direction'' means choosing seven complex
+\emph{weights} that rotate the phasors from the look direction into line so they add up exactly,
+while phasors from other directions partly cancel. Figure~\ref{fig:pipeline} shows the complete
+signal chain.
 
 \begin{figure}[ht]
 \centering
@@ -130,14 +106,63 @@ per channel and returns $H$ output samples. The weights are computed once.}
 \label{fig:pipeline}
 \end{figure}
 
+\begin{inplainwords}
+Follow the arrows in Figure~\ref{fig:pipeline}:
+\begin{enumerate}[nosep]
+\item \textbf{Record.} The board sends 8 channels of audio, 48\,000 samples per second each.
+\item \textbf{Select.} Keep the 7 real microphones and drop the spare channel.
+\item \textbf{Chop into frames.} Keep the last 512 samples of each mic and taper the edges
+  with a smooth window, so the FFT sees a clean chunk.
+\item \textbf{FFT.} Turn each mic's chunk into 257 frequency bins (one phasor per bin).
+\item \textbf{Beamform.} In every bin, multiply the 7 phasors by 7 pre-computed weights and add.
+  This is the only step that ``points'' the array.
+\item \textbf{Inverse FFT and overlap-add.} Turn the 257 combined bins back into samples, and
+  stitch consecutive frames together seamlessly.
+\item \textbf{Output.} Turn the volume up, stop any sample from exceeding full scale, and send
+  the same signal to both ears.
+\end{enumerate}
+\end{inplainwords}
+
 \paragraph{Notation.}
-$M=7$ microphones; sample rate $f_s=48\,000$\,Hz; hop $H=256$; FFT length $N=2H=512$;
-speed of sound $c=343$\,m/s; ring radius $r=0.043$\,m. Bold lower-case letters are column
-vectors in $\mathbb{C}^M$ (one entry per microphone). $(\cdot)\tr$ is the transpose and
-$(\cdot)\herm$ the conjugate transpose. Frequency bin $k\in\{0,\dots,N/2\}$ has centre
-frequency $f_k=k f_s/N=k\cdot 93.75$\,Hz. The acoustic wavenumber is $\kappa=2\pi f/c$
-(rad/m); the letter $k$ is reserved for the bin index. Table~\ref{tab:codemap} maps each part
+Table~\ref{tab:notation} lists the symbols used throughout. Bold lower-case letters are column
+vectors in $\mathbb{C}^M$ (one entry per microphone). Table~\ref{tab:codemap} maps each part
 of the code to a section of this document.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Symbol & Meaning & Value\\
+\midrule
+$M$ & number of microphones & 7\\
+$f_s$ & sample rate & 48\,000\,Hz\\
+$H$ & hop size (samples per callback) & 256\\
+$N$ & FFT length & $2H=512$\\
+$c$ & speed of sound & 343\,m/s\\
+$r$ & ring radius & 0.043\,m\\
+$k$ & frequency bin index & $0,\dots,N/2$\\
+$f_k$ & centre frequency of bin $k$ & $k f_s/N = k\cdot 93.75$\,Hz\\
+$\lambda$ & wavelength & $c/f$ (34\,cm at 1\,kHz)\\
+$\kappa$ & acoustic wavenumber & $2\pi f/c$ (rad/m)\\
+$\phi,\ \phi_0$ & azimuth (direction); look direction & $\phi_0=0^\circ$ (front)\\
+$\vp_m,\ \tau_m$ & position of mic $m$; its arrival time advance & \S\ref{sec:geometry}, \S\ref{sec:steering}\\
+$\vd(f,\phi)$ & steering vector (7 phasors) & \S\ref{sec:steering}\\
+$\vw(f)$ & beamformer weights (7 complex numbers per bin) & \S\ref{sec:das}, \S\ref{sec:sd}\\
+$\G,\ \mu$ & diffuse-noise coherence matrix; diagonal loading & \S\ref{sec:sd}; $\mu=0.05$\\
+\midrule
+$j$ & imaginary unit, $j^2=-1$ & ---\\
+$\overline{z}$ & complex conjugate: $\overline{a+jb}=a-jb$ & ---\\
+$|z|$ & magnitude of a complex number & ---\\
+$\|\vw\|$ & length of a vector, $\|\vw\|^2=\sum_m|w_m|^2$ & ---\\
+$(\cdot)\tr$ & transpose & ---\\
+$(\cdot)\herm$ & conjugate transpose (transpose and conjugate) & ---\\
+$\E[\cdot]$ & expected value (long-run average) & ---\\
+dB & $20\log_{10}$ of an amplitude ratio, $10\log_{10}$ of a power ratio & ---\\
+\bottomrule
+\end{tabular}
+\caption{Notation. The letter $k$ is reserved for the bin index; the wavenumber is $\kappa$.}
+\label{tab:notation}
+\end{table}
 
 \begin{table}[ht]
 \centering\small
@@ -159,6 +184,7 @@ constants & 6--35 & geometry, physics, gains & \ref{sec:geometry}, App.~\ref{app
 \caption{Where each piece of \texttt{demo.py} is explained.}
 \label{tab:codemap}
 \end{table}
+\FloatBarrier
 
 \begin{rationale}[: why work in the frequency domain?]
 The delays involved are tiny. The largest is $r/c\approx125\,\mu$s, about 6 samples, and most
@@ -252,16 +278,9 @@ With the look direction at $\phi_0=0$, both designs satisfy $|B(f,\phi)|=|B(f,-\
 The beam pattern is a mirror image about the front axis, so plotting
 $0^\circ\le\phi\le180^\circ$ shows all of it.
 \end{proposition}
-\begin{proof}
-Reflection $y\mapsto -y$ maps the set of mic positions onto itself. It swaps channels
-$5\leftrightarrow6$, $4\leftrightarrow1$, $3\leftrightarrow2$ and fixes $0$. Write $\mathbf P$
-for the corresponding symmetric permutation matrix ($\mathbf P=\mathbf P\tr=\mathbf P^{-1}$).
-From \eqref{eq:steer} below, $\vd(f,-\phi)=\mathbf P\vd(f,\phi)$, and in particular
-$\mathbf P\vd(f,0)=\vd(f,0)$. Distances are invariant under the reflection, so
-$\mathbf P\G\mathbf P=\G$. The weights in Sections~\ref{sec:das} and~\ref{sec:sd} are the
-\emph{unique} solutions of problems that are invariant under $\mathbf P$, so $\mathbf P\vw=\vw$.
-Therefore $B(f,-\phi)=\vw\herm\mathbf P\vd(f,\phi)=(\mathbf P\vw)\herm\vd(f,\phi)=B(f,\phi)$.
-\end{proof}
+\noindent\emph{Why it's true:} the board looks the same in a mirror held along its front axis,
+and the beam points straight down that axis. Nothing in the design can tell left from right, so
+the beam treats them identically. \emph{(Proof: Appendix~\ref{prf:symmetry}.)}
 
 \begin{remark}[Up/down ambiguity]
 The array is flat, so a source at elevation $+\epsilon$ and its mirror image at $-\epsilon$
@@ -281,9 +300,24 @@ it (Section~\ref{sec:gain}). A wrong mapping does not crash anything; it silentl
 beam somewhere else.
 \end{rationale}
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item Seven mics: one in the centre and six on a 43\,mm-radius hexagon. The beam looks toward
+  $\phi=0^\circ$, the side away from the USB cable.
+\item Only three mic spacings occur (43, 74.5 and 86\,mm). They set every frequency limit
+  that follows.
+\item The array is mirror-symmetric, so left and right are treated the same, and a flat array
+  cannot tell up from down.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Plane waves and the steering vector}\label{sec:steering}
 % =============================================================================
+
+\noindent\textbf{Why we need this.} To point the array at the talker, we first need a precise
+description of what a sound from a given direction ``looks like'' to the seven mics. That
+description is the steering vector, and every later formula is built from it.
 
 \begin{intuition}
 A distant talker produces wavefronts that are effectively flat by the time they cross a
@@ -333,8 +367,8 @@ origin, so it hears the wave $\tau_m=\vp_m\tr\vu/c$ seconds earlier (lines~61--6
 \end{figure}
 
 \paragraph{Derivation.}
-Let $\vu=[\cos\phi,\ \sin\phi]\tr$ be the unit vector pointing \emph{toward} the source
-(line~61). A plane wave that carries the signal $s(t)$ and travels in direction $-\vu$ has
+Let $\vu=[\cos\phi,\ \sin\phi]\tr$ be the \term{unitvector}{unit vector} pointing \emph{toward}
+the source (line~61). A \term{planewave}{plane wave} that carries the signal $s(t)$ and travels in direction $-\vu$ has
 pressure field
 \begin{equation}
   p(\mathbf x,t)=s\!\left(t+\frac{\vu\tr\mathbf x}{c}\right).
@@ -351,20 +385,36 @@ $s(t+\tau)\;\longleftrightarrow\;e^{+j2\pi f\tau}S(f)$. Stacking the seven mics 
   \vd(f,\phi)=\begin{bmatrix}e^{j2\pi f\tau_0}\\ \vdots\\ e^{j2\pi f\tau_6}\end{bmatrix}
   =\exp\!\big(j\kappa\,\vp_m\tr\vu\big)_{m=0}^{6}.
 \end{equation}
-The vector $\vd$ is the \emph{steering vector}: the array's fingerprint for direction $\phi$
-at frequency $f$. All of its entries have modulus one, so $\|\vd\|^2=M$. Because $\vp_0=\mathbf 0$,
-$d_0\equiv1$: the centre mic is the phase reference.
+The vector $\vd$ is the \term{steering}{steering vector}: the array's fingerprint for direction
+$\phi$ at frequency $f$. All of its entries have modulus one, so $\|\vd\|^2=M$. Because
+$\vp_0=\mathbf 0$, $d_0\equiv1$: the centre mic is the phase reference. The last form in
+\eqref{eq:steer} uses the \term{wavenumber}{wavenumber} $\kappa=2\pi f/c$, since
+$2\pi f\tau_m=\kappa\,\vp_m\tr\vu$.
+
+\begin{inplainwords}
+For one direction and one frequency, the steering vector is a list of seven arrows of length~1,
+one per mic. Each arrow's angle says how far ahead of the centre mic that mic hears the sound:
+\[
+  \text{angle of arrow }m=2\pi f\tau_m=360^\circ\times f\times(\text{head start of mic }m).
+\]
+\emph{Example.} For a talker straight ahead, mic~5 sits $r\cos30^\circ=37.2$\,mm closer to the
+talker than the centre mic, so $\tau_5=0.0372/343=108\,\mu$s. At $f=1$\,kHz its arrow is turned
+by $360^\circ\times1000\times0.000108\approx39^\circ$. At 100\,Hz it is turned only $3.9^\circ$.
+That is why low frequencies are hard: every mic's arrow points almost the same way, whatever the
+direction.
+\end{inplainwords}
 
 \demolines{58}{63}
 
-\paragraph{Code map.} Line~63 evaluates \eqref{eq:steer} for every bin at once.
-\code{freqs[:, None] * advance[None, :]} is the outer product $f_k\tau_m$, which gives an
+\paragraph{Code map.} Line~63 evaluates \eqref{eq:steer} for every \term{bin}{frequency bin} at
+once. The expression \code{freqs[:, None] * advance[None, :]} is the outer product $f_k\tau_m$,
+which gives an
 $F\times M$ array with $F=N/2+1=257$ (\code{np.fft.rfftfreq(512, 1/48000)}, line~68,
 returns $0, 93.75, \dots, 24\,000$\,Hz).
 
 \paragraph{Assumptions, and when they hold.}
 \begin{enumerate}
-\item \emph{Far field.} The wavefronts are flat if the source distance $R$ satisfies the
+\item \emph{\term{farfield}{Far field}.} The wavefronts are flat if the source distance $R$ satisfies the
   Fraunhofer criterion $R>2D^2/\lambda$. With $D=86$\,mm this is $0.17$\,m at 4\,kHz and
   even less at lower frequencies, so any talker further away than about an arm's length is
   in the far field.
@@ -376,9 +426,25 @@ returns $0, 93.75, \dots, 24\,000$\,Hz).
   frame of $512$ samples.
 \end{enumerate}
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item A distant talker's sound reaches each mic $\tau_m=\vp_m\tr\vu/c$ seconds early. The head
+  start depends only on the direction.
+\item In the frequency domain each head start is a rotation $e^{j2\pi f\tau_m}$. Stacking the seven
+  rotations gives the steering vector $\vd(f,\phi)$.
+\item The rotations grow with frequency. At low frequency all seven are nearly identical, which
+  is the root of the low-frequency problem.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Distortionless beamforming and delay-and-sum}\label{sec:das}
 % =============================================================================
+
+\noindent\textbf{Why we need this.} Now that we know what the talker looks like to the array
+($\vd$), we need a rule for combining the seven mics and a way to score how good a combination is.
+This section sets up both and finds the simplest good answer, delay-and-sum. It then shows why
+that answer is not enough for a board this small.
 
 A (narrowband) beamformer forms one output per bin as a linear combination of the mics:
 \begin{equation}\label{eq:beam}
@@ -388,24 +454,37 @@ The conjugate is a convention that makes $Y$ an inner product. The code follows 
 \code{w_h = weights.conj()} (line~92) and \code{w[k].conj() @ d} (line~127).
 
 \paragraph{Signal model and performance measures.}
-Write each STFT bin as target plus noise, $\vx=S\vd+\vn$, with noise covariance
-$\E[\vn\vn\herm]=\sigma_v^2\G$, where $\Gamma_{mm}=1$ (so $\G$ is a \emph{coherence}
-matrix). Then
+Write each STFT bin as target plus noise, $\vx=S\vd+\vn$, with noise
+\term{covariance}{covariance} $\E[\vn\vn\herm]=\sigma_v^2\G$, where $\Gamma_{mm}=1$ (so $\G$ is a
+\term{coherence}{coherence} matrix). Here $S$ is the talker's signal in this bin, $\vn$ is the
+noise at the seven mics, and $\sigma_v^2$ is the noise power at one mic. Then
 \begin{equation}
   Y=S\,(\vw\herm\vd)+\vw\herm\vn,\qquad
   \E|\vw\herm\vn|^2=\sigma_v^2\,\vw\herm\G\vw .
 \end{equation}
 
 \begin{definition}[Distortionless constraint; array gain]
-A beamformer is \emph{distortionless} toward $\phi_0$ if $\vw\herm\vd(f,\phi_0)=1$ at every $f$.
-Its \emph{array gain} against noise field $\G$ is the output SNR divided by the SNR at a single mic:
+A beamformer is \term{distortionless}{distortionless} toward $\phi_0$ if $\vw\herm\vd(f,\phi_0)=1$
+at every $f$. Its \term{arraygain}{array gain} against noise field $\G$ is the output
+\term{snr}{SNR} divided by the SNR at a single mic:
 \begin{equation}\label{eq:gain}
   A_{\G}(\vw)=\frac{|\vw\herm\vd|^2}{\vw\herm\G\vw}.
 \end{equation}
-Two cases matter. The \emph{white-noise gain} is $\WNG=A_{\mI}$, for mic self-noise, which is
-independent from mic to mic. The \emph{directivity index} is $\DI=A_{\G_{\mathrm{diff}}}$, for
-reverberation and babble arriving from all directions (Section~\ref{sec:sd}).
+Two cases matter. The \term{wng}{white-noise gain} is $\WNG=A_{\mI}$, for mic
+\term{selfnoise}{self-noise}, which is independent from mic to mic. The
+\term{di}{directivity index} is $\DI=A_{\G_{\mathrm{diff}}}$, for reverberation and babble
+arriving from all directions (Section~\ref{sec:sd}).
 \end{definition}
+
+\begin{inplainwords}
+The numerator $|\vw\herm\vd|^2$ is how much talker comes out, and the denominator
+$\vw\herm\G\vw$ is how much noise comes out. The array gain is ``how many times better is the
+talker-to-noise ratio than with one mic''. Once we impose $\vw\herm\vd=1$, the numerator is
+fixed at~1, so maximising the gain is the same as \emph{minimising the output noise}. That is the
+single design goal of this whole document. Typical values: $\WNG=8.45$\,dB means mic hiss is
+7 times weaker in power than with a single mic, and $\WNG<0$\,dB means the beamformer makes hiss
+\emph{louder}.
+\end{inplainwords}
 
 The distortionless constraint is why the talker's voice comes out with its original timbre.
 Whatever happens to the noise, the target spectrum is multiplied by exactly~1 in every bin.
@@ -416,11 +495,10 @@ Whatever happens to the noise, the target spectrum is multiplied by exactly~1 in
 Among all $\vw$ with $\vw\herm\vd=1$, the white-noise gain $1/\|\vw\|^2$ is maximised uniquely by
 $\vw=\vd/M$ (line~73), and the maximum is $\WNG=M$, i.e.\ $10\log_{10}7=8.45$\,dB.
 \end{proposition}
-\begin{proof}
-By Cauchy--Schwarz, $1=|\vw\herm\vd|^2\le\|\vw\|^2\|\vd\|^2=M\|\vw\|^2$, so
-$\WNG=1/\|\vw\|^2\le M$. Equality holds iff $\vw\propto\vd$, and the constraint fixes the
-constant: $\vw\herm\vd=\vd\herm\vd/M=1$.
-\end{proof}
+\noindent\emph{Why it's true:} the self-noise power that comes out is $\|\vw\|^2$, so we want the
+shortest weight vector that still satisfies $\vw\herm\vd=1$. The shortest one points straight
+along $\vd$. (The background document's section on constrained optimization draws this in 2-D.)
+\emph{(Proof: Appendix~\ref{prf:das}.)}
 
 \begin{intuition}
 $\overline{d_m}=e^{-j2\pi f\tau_m}$ undoes each mic's head start, so the seven copies of the
@@ -436,15 +514,30 @@ DAS's directivity index there is only $0.15$\,dB (Figure~\ref{fig:wngdi}), while
 energy in speech and room noise lies below 1\,kHz. Getting directivity out of a small array
 needs a different criterion.
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item The beamformer output in each bin is $Y=\vw\herm\vx$: rotate and scale each mic, then add.
+\item The distortionless rule $\vw\herm\vd=1$ keeps the talker untouched, so a good design is
+  simply one that lets out as little noise as possible.
+\item \term{das}{Delay-and-sum} ($\vw=\vd/M$) is the best design against mic hiss (+8.45\,dB),
+  but below about 1\,kHz it is barely directional on this small board.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Superdirective (MVDR) beamforming against diffuse noise}\label{sec:sd}
 % =============================================================================
 
+\noindent\textbf{Why we need this.} Delay-and-sum fights mic hiss, but in a real room the bigger
+problem is echo and background chatter coming from everywhere. This section designs weights
+aimed at \emph{that} noise. The result, the \term{superdirective}{superdirective} beamformer, is
+the design \texttt{demo.py} actually uses.
+
 \subsection{The diffuse noise field}
 
-Reverberation and distant babble behave like a \emph{spherically isotropic} (diffuse) field:
-infinitely many mutually uncorrelated plane waves of equal power, arriving uniformly from all
-directions in 3-D.
+Reverberation and distant babble behave like a \emph{spherically isotropic}
+(\term{diffuse}{diffuse}) field: infinitely many mutually uncorrelated plane waves of equal
+power, arriving uniformly from all directions in 3-D.
 
 \begin{proposition}[Diffuse-field coherence]\label{prop:sinc}
 In a diffuse field, the coherence between two omnidirectional mics a distance $d_{ij}$ apart is
@@ -452,19 +545,19 @@ In a diffuse field, the coherence between two omnidirectional mics a distance $d
   \Gamma_{ij}(f)=\frac{\sin(\kappa d_{ij})}{\kappa d_{ij}},\qquad \kappa=\frac{2\pi f}{c}.
 \end{equation}
 \end{proposition}
-\begin{proof}
-Each plane wave from direction $\vu\in S^2$ contributes $e^{j\kappa\vu\tr\vp_i}$ to mic $i$.
-The waves are uncorrelated and have equal power, so
-\[
-  \Gamma_{ij}=\frac{1}{4\pi}\oint_{S^2}e^{j\kappa\,\vu\tr(\vp_i-\vp_j)}\,d\Omega(\vu).
-\]
-Choose the polar axis along $\vp_i-\vp_j$, so that $\vu\tr(\vp_i-\vp_j)=d_{ij}\cos\vartheta$.
-The azimuthal integral contributes $2\pi$. Substituting $\mu=\cos\vartheta$,
-\[
-  \Gamma_{ij}=\frac{1}{2}\int_0^{\pi}e^{j\kappa d_{ij}\cos\vartheta}\sin\vartheta\,d\vartheta
-  =\frac12\int_{-1}^{1}e^{j\kappa d_{ij}\mu}\,d\mu=\frac{\sin(\kappa d_{ij})}{\kappa d_{ij}}.\qedhere
-\]
-\end{proof}
+\noindent\emph{Why it's true:} average the phase difference $e^{j\kappa\,\vu\tr(\vp_i-\vp_j)}$
+that a single plane wave creates between mics $i$ and $j$ over every possible arrival direction
+$\vu$. The waves that hit both mics at the same time contribute in phase, and the rest partly
+cancel. The average works out to this ``sinc'' curve. \emph{(Proof, which needs an integral over
+a sphere: Appendix~\ref{prf:sinc}.)}
+
+\begin{inplainwords}
+$\kappa d_{ij}=2\pi d_{ij}/\lambda$ compares the mic spacing with the wavelength. When the mics are
+much closer together than a wavelength ($\kappa d\ll1$), $\sin(\kappa d)/(\kappa d)\approx1$:
+the two mics hear practically \emph{the same} room noise. When they are far apart compared with
+a wavelength, the coherence wiggles around~0: their noises are unrelated. For the 43\,mm
+spacing, the coherence is still $0.97$ at 500\,Hz.
+\end{inplainwords}
 
 NumPy's \code{np.sinc(x)} is the \emph{normalised} sinc, $\sin(\pi x)/(\pi x)$. With
 $x=2fd/c$ we get $\pi x=2\pi f d/c=\kappa d$, so line~79 is exactly~\eqref{eq:sinc}.
@@ -509,6 +602,12 @@ diagonal loading below.
 
 \subsection{The optimal weights}
 
+We now pick the weights that let through as little diffuse noise as possible while keeping the
+talker at gain~1. This recipe is called \term{mvdr}{MVDR} (minimum-variance distortionless
+response). The matrix $\Gmu=\G+\mu\mI$ below is the coherence matrix with a small number $\mu$
+added to its diagonal. This \term{loading}{diagonal loading} is explained in
+Section~\ref{sec:loading}; for now, think of $\Gmu$ as ``the noise we are trying to reject''.
+
 \begin{proposition}[MVDR / superdirective solution]\label{prop:mvdr}
 Let $\Gmu=\G+\mu\mI$ with $\mu>0$. The problem
 \begin{equation}
@@ -520,22 +619,17 @@ has the unique solution
   \qquad\text{with minimum value}\qquad \frac{1}{\vd\herm\Gmu^{-1}\vd}.
 \end{equation}
 \end{proposition}
-\begin{proof}
-$\G$ is an average of rank-one matrices $\mathbf a\mathbf a\herm$ (see the proof of
-Proposition~\ref{prop:sinc}), so it is Hermitian positive semidefinite. Hence $\Gmu$ is
-positive definite and has a positive-definite square root. Apply Cauchy--Schwarz to the
-vectors $\Gmu^{1/2}\vw$ and $\Gmu^{-1/2}\vd$:
-\[
-  1=|\vw\herm\vd|^2=\big|(\Gmu^{1/2}\vw)\herm(\Gmu^{-1/2}\vd)\big|^2
-  \le(\vw\herm\Gmu\vw)\,(\vd\herm\Gmu^{-1}\vd).
-\]
-So $\vw\herm\Gmu\vw\ge1/(\vd\herm\Gmu^{-1}\vd)$, with equality iff
-$\Gmu^{1/2}\vw\propto\Gmu^{-1/2}\vd$, i.e.\ $\vw\propto\Gmu^{-1}\vd$. The constraint fixes the
-scale and gives \eqref{eq:mvdr}.
-\end{proof}
+\noindent\emph{Why it's true:} it is the same argument as Proposition~\ref{prop:das}, with the
+plain length $\|\vw\|^2$ replaced by the ``noise-weighted length'' $\vw\herm\Gmu\vw$.
+Delay-and-sum is simply the special case $\Gmu=\mI$. \emph{(Proof: Appendix~\ref{prf:mvdr}.)}
 
-This is the same argument as Proposition~\ref{prop:das}, carried out in the inner product
-weighted by $\Gmu$. Delay-and-sum is simply the special case $\Gmu=\mI$.
+\begin{inplainwords}
+Read the boxed formula right to left. $\Gmu^{-1}\vd$ starts from the delay-and-sum direction $\vd$
+and bends it away from whatever the noise has in common across mics. The denominator
+$\vd\herm\Gmu^{-1}\vd$ is just a positive number that rescales the result so the talker still
+comes out at gain exactly~1. In practice the bent weights take \emph{differences} between
+neighbouring mics, which cancels the low-frequency room noise that all mics share.
+\end{inplainwords}
 
 \demolines{75}{82}
 
@@ -548,8 +642,12 @@ start-up (line~197). The real-time callback never touches this code.
 \subsection{Why the diagonal loading is essential}\label{sec:loading}
 
 \paragraph{Ill-conditioning at low frequency.} As $f\to0$, \eqref{eq:sinc} gives
-$\G\to\one\one\tr$, a rank-one matrix, so $\G^{-1}$ blows up. The condition numbers of the
-actual $7\times7$ matrices (computed from the code's geometry) are:
+$\G\to\one\one\tr$, a rank-one matrix (every entry is 1, so every row is the same), and $\G^{-1}$
+blows up. The \term{cond}{condition number} measures how close a matrix is to this situation: it
+is the worst-case factor by which a small error in the input (rounding, or a mic that differs
+slightly from the model) can be magnified in the solution. Near~1 is harmless, and
+$10^{10}$ means the answer is meaningless. The condition numbers of the actual $7\times7$
+matrices (computed from the code's geometry) are:
 
 \begin{center}\small
 \begin{tabular}{@{}lcccc@{}}
@@ -576,14 +674,15 @@ self-noise by the factor $\|\vw\|^2=1/\WNG$, which is enormous.
   sensor noise whose power is $\mu$ times the diffuse power. The design is optimal for that mixed
   field.
 \item \emph{A dial between two designs.} At $\mu\to0$ the design is fully superdirective. As
-  $\mu\to\infty$ it becomes delay-and-sum. To see the second limit, expand
-  $\Gmu^{-1}=\mu^{-1}(\mI+\G/\mu)^{-1}=\mu^{-1}\big(\mI-\G/\mu+O(\mu^{-2})\big)$. Then
-  $\Gmu^{-1}\vd\propto\vd+O(\mu^{-1})$, and after normalising, $\vw\to\vd/M$.
+  $\mu\to\infty$ it becomes delay-and-sum, because $\mu\mI$ swamps $\G$ and $\Gmu$ looks like a
+  multiple of $\mI$ (Appendix~\ref{prf:limit}).
 \end{enumerate}
 
 \paragraph{The measured trade-off.} The table sweeps $\mu$ at the 281\,Hz bin, using the
 code's geometry. WNG and DI are defined in~\eqref{eq:gain}, and ``back'' is $|B|$ at
-$\phi=180^\circ$.
+$\phi=180^\circ$. \emph{How to read it:} move left for a more directional beam (DI goes up) but
+more hiss (WNG goes down), and move right for the reverse. For DI and WNG, higher is better, and
+for ``back'', more negative is better.
 
 \begin{center}\small
 \begin{tabular}{@{}lcccccc@{}}
@@ -619,9 +718,25 @@ room, raise $\mu$. If it sounds roomy, lower it.
   $\operatorname{cond}(\G)$ is already below 8.
 \end{itemize}
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item Room noise arrives from everywhere. At low frequency, neighbouring mics hear almost the same
+  room noise (coherence $\approx1$).
+\item The superdirective/MVDR weights $\vw=\Gmu^{-1}\vd/(\vd\herm\Gmu^{-1}\vd)$ exploit that by
+  taking differences between mics. They give $5.5$\,dB of directivity at 281\,Hz, where
+  delay-and-sum gives $0.15$\,dB.
+\item Taking differences amplifies mic hiss. Diagonal loading $\mu=0.05$ sets the balance between
+  directivity and hiss, and the design becomes delay-and-sum at very low and high frequencies.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Beam pattern, white-noise gain and spatial aliasing}\label{sec:pattern}
 % =============================================================================
+
+\noindent\textbf{Why we need this.} We have two candidate designs. This section measures how
+well each one actually listens in the look direction and ignores the others, at every frequency,
+and finds the limit that no choice of weights can overcome.
 
 \begin{definition}[Beam pattern]
 For weights designed toward $\phi_0$, the response to a unit plane wave from $\phi$ is
@@ -630,6 +745,14 @@ For weights designed toward $\phi_0$, the response to a unit plane wave from $\p
 \end{equation}
 The distortionless constraint gives $B(f,\phi_0)=1=0$\,dB.
 \end{definition}
+
+\begin{inplainwords}
+The \term{beampattern}{beam pattern} answers: ``if a sound of frequency $f$ comes from direction
+$\phi$, how loud is it after the beamformer, compared with sound from the front?'' $0$\,dB means
+just as loud, $-10$\,dB means about a third of the amplitude, and $-20$\,dB means a tenth. In the polar
+plots below, the further the curve is from the centre in some direction, the more the array
+hears from that direction. A narrow curve pointing up is a sharp, forward-facing beam.
+\end{inplainwords}
 
 \demolines{112}{131}
 
@@ -692,7 +815,9 @@ which is enough by Proposition~\ref{prop:symmetry}.}
 \label{fig:patterns}
 \end{figure}
 
-\paragraph{Reading the patterns.} Half-width at $-3$\,dB, read off the 5$^\circ$ grid:
+\paragraph{Reading the patterns.} A standard way to measure beam width is the
+\emph{half-width at $-3$\,dB}: the angle from the front at which the response has dropped to half
+power. Smaller numbers mean a narrower, more selective beam. Read off the 5$^\circ$ grid:
 
 \begin{center}\small
 \begin{tabular}{@{}lcccc@{}}
@@ -741,32 +866,53 @@ DAS has 0.15\,dB.}
 \label{fig:wngdi}
 \end{figure}
 
-\subsection{Spatial aliasing and the front--back lobe}
+\subsection{Spatial aliasing and the front--back lobe}\label{sec:aliasing}
 
+In time, sampling too slowly makes a high frequency impossible to tell apart from a lower one.
+Microphones \emph{sample space}, and the same thing happens: if the mics are too far apart
+compared with the wavelength, two different directions can produce identical steering vectors.
+This is \term{aliasing}{spatial aliasing}.
 A uniformly sampled line array obeys a \emph{spatial} Nyquist rule: the spacing must be below
 $\lambda/2$, i.e.\ $f<c/(2d_{\min})=343/(2\cdot0.043)\approx3.99$\,kHz. A hexagon is not a
 line, but the same mechanism gives one clean, exact result.
 
-\begin{proposition}[Front/back ambiguity at 4.61 kHz]
+\begin{proposition}[Front/back ambiguity at 4.61 kHz]\label{prop:frontback}
 At $f^\star=c/(2r\cos30^\circ)\approx4.61$\,kHz, the steering vectors for $\phi=0^\circ$ and
 $\phi=180^\circ$ are identical. Every beamformer then has $|B(f^\star,180^\circ)|=|B(f^\star,0^\circ)|=1$.
 \end{proposition}
-\begin{proof}
-For $\phi=0^\circ$ and $180^\circ$, $\vu=\pm\mathbf e_x$, so $d_m=e^{\pm j\kappa x_m}$, where
-$x_m$ is mic $m$'s front coordinate. The two vectors agree iff $e^{2j\kappa x_m}=1$ for all
-$m$. The $x_m$ take the values $0$ (mics 0, 1, 4) and $\pm r\cos30^\circ=\pm37.2$\,mm (mics
-5, 6, 2, 3). So the condition is $2\kappa\cdot37.2\,\text{mm}\in2\pi\mathbb Z$, whose smallest
-positive solution is $f^\star=c/(2\cdot0.0372)$.
-\end{proof}
+\noindent\emph{Why it's true:} the front pair of mics (5, 6) sits $37.2$\,mm ahead of the centre
+row, and the back pair (2, 3) sits $37.2$\,mm behind it. At 4.61\,kHz, $37.2$\,mm is exactly half
+a wavelength. A sound from the front reaches the front pair half a cycle early, and a sound
+from the back reaches it half a cycle late. A half-cycle lead and a half-cycle lag are the same
+rotation ($e^{j\pi}=e^{-j\pi}=-1$), so the array sees identical phase patterns from both
+directions.
+\emph{(Proof: Appendix~\ref{prf:frontback}.)}
 
 The 4031\,Hz panel of Figure~\ref{fig:patterns} is already approaching $f^\star$, and shows a
 $-1.6$\,dB lobe straight behind the array for \emph{both} designs. No choice of weights can fix
 this, because it is a property of the geometry. In practice the array gives useful rejection
 from about 300\,Hz to 4\,kHz, which covers most of the energy and intelligibility of speech.
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item Below about 2\,kHz the superdirective beam is genuinely directional, while delay-and-sum is
+  nearly omnidirectional. Above about 4\,kHz the two designs are the same.
+\item The price is hiss: below about 600\,Hz the superdirective beam makes mic self-noise louder
+  than a single mic (WNG $<0$\,dB).
+\item Near 4.6\,kHz the array cannot tell front from back. That limit comes from the geometry, and
+  no choice of weights removes it.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Streaming: STFT analysis, beamforming, overlap-add synthesis}\label{sec:stft}
 % =============================================================================
+
+\noindent\textbf{Why we need this.} Sections~\ref{sec:steering}--\ref{sec:pattern} designed one
+set of weights per frequency bin. Audio, however, arrives as an endless stream of samples, 256 at
+a time, and must leave just as fast. This section explains how the program converts the stream
+into frequency bins and back again in real time without adding clicks, gaps or echoes. The tool
+is the \term{stft}{short-time Fourier transform} with \term{ola}{overlap-add}.
 
 \demolines{85}{109}
 
@@ -785,6 +931,23 @@ Index blocks so that block $t$ holds samples $[tH,(t+1)H)$. When block $t$ arriv
   y[(t-1)H+n]&\mathrel{+}=y^{(t)}[n]
      &&\text{(overlap-add, line 105)}
 \end{align}
+
+\begin{inplainwords}
+Each time 256 new samples arrive, the program does four things:
+\begin{enumerate}[nosep]
+\item \textbf{Analysis.} Take the latest 512 samples of each mic (256 old + 256 new, one
+  \term{frame}{frame}), taper their ends with the \term{window}{window} $g$, and FFT them into
+  257 bins.
+\item \textbf{Beamform.} In each bin, combine the seven mics with that bin's weights. This gives
+  one number per bin.
+\item \textbf{Synthesis.} Inverse-FFT the 257 numbers back into 512 samples, and taper them with
+  $g$ again.
+\item \textbf{Overlap-add.} Add those 512 samples onto the running output. Each output sample
+  receives contributions from exactly two consecutive frames, and once both have arrived it is
+  finished and sent to the headphones.
+\end{enumerate}
+The superscript $(t)$ just means ``belonging to frame number $t$''.
+\end{inplainwords}
 In the synthesis line, \code{irfft} fills in the bins $k>N/2$ by Hermitian symmetry,
 $Y[N-k]=\overline{Y[k]}$, which guarantees a real output. Equivalently, the weights define
 real-valued filters.
@@ -795,31 +958,26 @@ a $257\times257$ matrix, which \code{w_h @ spec} would.
 
 \subsection{The window and perfect reconstruction}
 
-Line~91 builds $g[n]=\sqrt{h[n]}$ from the \emph{periodic} Hann window:
+Line~91 builds $g[n]=\sqrt{h[n]}$ from the \emph{periodic} \term{hann}{Hann window}:
 \begin{equation}
   h[n]=\tfrac12-\tfrac12\cos\!\frac{2\pi n}{N}=\sin^2\!\frac{\pi n}{N},
   \qquad g[n]=\sin\frac{\pi n}{N},\qquad n=0,\dots,N-1.
 \end{equation}
 \code{np.hanning(N+1)[:-1]} produces exactly this: NumPy's $(N{+}1)$-point symmetric window
 has denominator $N$, and dropping the last sample makes it periodic. The square root of a Hann
-window is the \emph{sine window}.
+window is the \term{sinewin}{sine window}.
 
-\begin{proposition}[COLA, and perfect reconstruction with delay $H$]\label{prop:cola}
+\begin{proposition}[\term{cola}{COLA}, and perfect reconstruction with delay $H$]\label{prop:cola}
 (a) $h[n]+h[n+H]=1$ for $0\le n<H$.
 (b) If the beamforming step were replaced by the identity ($Y=X$, one channel), the output of
 \code{process} for block $t$ would be exactly input block $t-1$: $y[n]=x[n-H]$.
 \end{proposition}
-\begin{proof}
-(a) $h[n+N/2]=\sin^2(\pi n/N+\pi/2)=\cos^2(\pi n/N)$, so the sum is $\sin^2+\cos^2=1$.
-
-(b) With $Y=X$, the IFFT returns the windowed frame, and the synthesis window brings the
-total weighting to $g^2=h$. A given sample $x[s]$ lies in exactly two frames, at offsets
-$n$ and $n+H$, so the overlap-add output at $s$ is $(h[n]+h[n+H])\,x[s]=x[s]$ by~(a).
-For timing, see Figure~\ref{fig:buffers}. After frame $t$ is added, the first $H$ entries of
-\code{out_buf} correspond to times $[(t-1)H,tH)$, which is block $t-1$. Those entries now hold
-contributions from both frames covering them ($t-1$ and $t$), so they are complete. Line~106
-emits them, and lines~107--108 shift the buffer and zero the tail for the next call.
-\end{proof}
+\noindent\emph{Why it's true:} (a) is the identity $\sin^2+\cos^2=1$, because shifting a
+$\sin^2$ hill by half its width turns it into $\cos^2$ (Figure~\ref{fig:cola}). For (b), each
+sample is windowed twice (once by $g$ before the FFT and once after), for a total weight of
+$g^2=h$. It lies in exactly two overlapping frames, whose weights add to~1 by~(a). So if the
+beamformer did nothing, the output would be the input, one block late.
+\emph{(Proof: Appendix~\ref{prf:cola}.)}
 
 \begin{figure}[ht]
 \centering
@@ -873,7 +1031,7 @@ filtered, so the algorithm adds exactly $H$ samples of delay.}
 
 \subsection{Circular convolution and how much it matters}
 
-Multiplying DFT bins is \emph{circular} convolution. Each mic is convolved with the length-$N$
+Multiplying DFT bins is \term{circconv}{circular convolution}. Each mic is convolved with the length-$N$
 impulse response $\mathrm{h}_m=\code{irfft}(\overline{w_{\cdot,m}})$, and any part of that
 response that extends past the frame edge wraps around to the other end. For DAS the responses
 are fractional delays of at most 6 samples, so the wrap is negligible. The superdirective
@@ -892,8 +1050,8 @@ are not exactly real, but that bin is far above anything the MEMS mics or the ea
 
 \begin{rationale}[s for the STFT]
 \begin{itemize}
-\item \textbf{$\sqrt{\text{Hann}}$ on both sides.} The analysis taper limits spectral leakage
-  between bins. The synthesis taper makes each processed frame fade in and out, so changes in
+\item \textbf{$\sqrt{\text{Hann}}$ on both sides.} The analysis taper limits
+  \term{leakage}{spectral leakage} between bins. The synthesis taper makes each processed frame fade in and out, so changes in
   the frame's content never produce edge discontinuities (clicks), and it suppresses circular
   wrap. COLA only constrains the \emph{product} $g_a g_s$, so the symmetric split $g_a=g_s=\sqrt h$
   gives both benefits.
@@ -902,7 +1060,7 @@ are not exactly real, but that bin is far above anything the MEMS mics or the ea
   trick on line~91 makes the identity exact.
 \item \textbf{50\% overlap ($N=2H$).} This is the least overlap for which the sine-window pair
   satisfies COLA. It costs one FFT per channel per hop, the minimum possible.
-\item \textbf{$H=256$ at 48\,kHz.} This gives an algorithmic latency of $H/f_s=5.33$\,ms (plus
+\item \textbf{$H=256$ at 48\,kHz.} This gives an algorithmic \term{latency}{latency} of $H/f_s=5.33$\,ms (plus
   device buffering) and a bin spacing of $f_s/N=93.75$\,Hz. Halving $H$ would halve the latency
   but give only 2--3 bins below 300\,Hz, exactly where superdirectivity earns its keep. Doubling
   $H$ would give finer bins but 10.7\,ms of latency, which becomes noticeable when you can also
@@ -917,9 +1075,24 @@ are not exactly real, but that bin is far above anything the MEMS mics or the ea
 \end{itemize}
 \end{rationale}
 
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item Every 256 samples the program FFTs the last 512 samples of each mic, beamforms each bin,
+  inverse-FFTs, and overlap-adds.
+\item The sine window used twice adds up to a Hann window, and 50\%-overlapped Hann windows sum to
+  exactly~1, so the processing adds no gaps or clicks.
+\item The cost is $H=256$ samples (5.33\,ms) of delay, a deliberate trade between latency and
+  low-frequency resolution.
+\end{itemize}
+\end{takeaways}
+
 % =============================================================================
 \section{Gain staging, output and level metering}\label{sec:gain}
 % =============================================================================
+
+\noindent\textbf{Why we need this.} The beamformed signal is clean but very quiet. This last
+stage makes it loud enough to hear, protects the headphones from overloads, and gives you a meter
+for checking that the microphones are wired the way the code assumes.
 
 \demolines{135}{147}
 
@@ -938,8 +1111,9 @@ power of two and the scaling adds no rounding error at all.
 \begin{rationale}[s for the output stage]
 \begin{itemize}
 \item \textbf{Why so much gain.} The RAW firmware (\code{micArray_vf_raw}) applies no digital
-  gain, and MEMS mics at conversational distances sit far below full scale.
-\item \textbf{Why clip} (line~146). Values outside $[-1,1]$ would be wrapped or otherwise mangled
+  gain, and \term{mems}{MEMS} mics at conversational distances sit far below
+  \term{fullscale}{full scale}.
+\item \textbf{Why \term{clipping}{clip}} (line~146). Values outside $[-1,1]$ would be wrapped or otherwise mangled
   by the output path. A hard clip limits the damage to brief distortion during overloads. It
   does nothing at normal levels.
 \item \textbf{Why mono to both ears} (line~147). A beamformer produces one signal. Feeding it to
@@ -949,10 +1123,20 @@ power of two and the scaling adds no rounding error at all.
 
 \paragraph{Level metering (\code{--levels}).} Lines~157--158 print, for each channel, the
 level in dB relative to full scale over a 100\,ms block:
-$L=20\log_{10}\!\big(\sqrt{\tfrac1n\sum x^2}\big)$\,dBFS. A full-scale sine reads
+$L=20\log_{10}\!\big(\sqrt{\tfrac1n\sum x^2}\big)$\,\term{dbfs}{dBFS}. A full-scale sine reads
 $-3.01$\,dBFS, a silent channel reads about $-240$\,dBFS (from the $10^{-12}$ floor), and
 tapping a mic makes its channel jump by tens of dB. This is how you verify the channel mapping
 assumed on lines~20--27.
+
+\begin{takeaways}
+\begin{itemize}[nosep]
+\item The beamformer passes the talker at gain~1, so all the loudness comes from one output gain,
+  $G=16$ ($+24$\,dB) by default, adjustable in 6\,dB steps with \code{--gain-shift}.
+\item Samples are clipped to $\pm1$, and the same mono signal goes to both ears.
+\item \code{--levels} shows each channel's level, so you can tap each mic and confirm the channel
+  mapping.
+\end{itemize}
+\end{takeaways}
 
 % =============================================================================
 \appendix
@@ -979,7 +1163,95 @@ Constant (line) & Value & Meaning; effect of changing it\\
 \end{tabular}
 \end{center}
 
-\section{Symbols}
+% =============================================================================
+\section{Proofs}\label{app:proofs}
+% =============================================================================
+These are the full arguments behind the propositions in the main text. They use a little more
+mathematics than the rest of the document (complex inner products, a matrix square root, and in
+one case an integral over a sphere), and none of them is needed to follow the design.
+
+\subsection{Left/right symmetry (Proposition~\ref{prop:symmetry})}\label{prf:symmetry}
+\begin{proof}
+Reflection $y\mapsto -y$ maps the set of mic positions onto itself. It swaps channels
+$5\leftrightarrow6$, $4\leftrightarrow1$, $3\leftrightarrow2$ and fixes $0$. Write $\mathbf P$
+for the corresponding symmetric permutation matrix ($\mathbf P=\mathbf P\tr=\mathbf P^{-1}$).
+From \eqref{eq:steer}, $\vd(f,-\phi)=\mathbf P\vd(f,\phi)$, and in particular
+$\mathbf P\vd(f,0)=\vd(f,0)$. Distances are invariant under the reflection, so
+$\mathbf P\G\mathbf P=\G$. The weights in Sections~\ref{sec:das} and~\ref{sec:sd} are the
+\emph{unique} solutions of problems that are invariant under $\mathbf P$, so $\mathbf P\vw=\vw$.
+Therefore $B(f,-\phi)=\vw\herm\mathbf P\vd(f,\phi)=(\mathbf P\vw)\herm\vd(f,\phi)=B(f,\phi)$.
+\end{proof}
+
+\subsection{Delay-and-sum is WNG-optimal (Proposition~\ref{prop:das})}\label{prf:das}
+\begin{proof}
+By Cauchy--Schwarz, $1=|\vw\herm\vd|^2\le\|\vw\|^2\|\vd\|^2=M\|\vw\|^2$, so
+$\WNG=1/\|\vw\|^2\le M$. Equality holds iff $\vw\propto\vd$, and the constraint fixes the
+constant: $\vw\herm\vd=\vd\herm\vd/M=1$.
+\end{proof}
+
+\subsection{Diffuse-field coherence (Proposition~\ref{prop:sinc})}\label{prf:sinc}
+\begin{proof}
+Each plane wave from direction $\vu\in S^2$ (the unit sphere) contributes $e^{j\kappa\vu\tr\vp_i}$
+to mic $i$. The waves are uncorrelated and have equal power, so the coherence is the average over
+all directions:
+\[
+  \Gamma_{ij}=\frac{1}{4\pi}\oint_{S^2}e^{j\kappa\,\vu\tr(\vp_i-\vp_j)}\,d\Omega(\vu).
+\]
+Choose the polar axis along $\vp_i-\vp_j$, so that $\vu\tr(\vp_i-\vp_j)=d_{ij}\cos\vartheta$.
+The azimuthal integral contributes $2\pi$. Substituting $\mu=\cos\vartheta$,
+\[
+  \Gamma_{ij}=\frac{1}{2}\int_0^{\pi}e^{j\kappa d_{ij}\cos\vartheta}\sin\vartheta\,d\vartheta
+  =\frac12\int_{-1}^{1}e^{j\kappa d_{ij}\mu}\,d\mu=\frac{\sin(\kappa d_{ij})}{\kappa d_{ij}}.\qedhere
+\]
+\end{proof}
+
+\subsection{The MVDR / superdirective solution (Proposition~\ref{prop:mvdr})}\label{prf:mvdr}
+\begin{proof}
+$\G$ is an average of rank-one matrices $\mathbf a\mathbf a\herm$ (see the proof in
+Appendix~\ref{prf:sinc}), so it is Hermitian positive semidefinite. Hence $\Gmu$ is
+positive definite and has a positive-definite square root. Apply Cauchy--Schwarz to the
+vectors $\Gmu^{1/2}\vw$ and $\Gmu^{-1/2}\vd$:
+\[
+  1=|\vw\herm\vd|^2=\big|(\Gmu^{1/2}\vw)\herm(\Gmu^{-1/2}\vd)\big|^2
+  \le(\vw\herm\Gmu\vw)\,(\vd\herm\Gmu^{-1}\vd).
+\]
+So $\vw\herm\Gmu\vw\ge1/(\vd\herm\Gmu^{-1}\vd)$, with equality iff
+$\Gmu^{1/2}\vw\propto\Gmu^{-1/2}\vd$, i.e.\ $\vw\propto\Gmu^{-1}\vd$. The constraint fixes the
+scale and gives \eqref{eq:mvdr}.
+\end{proof}
+
+\subsection{Large loading gives delay-and-sum (Section~\ref{sec:loading})}\label{prf:limit}
+\begin{proof}
+Expand $\Gmu^{-1}=\mu^{-1}(\mI+\G/\mu)^{-1}=\mu^{-1}\big(\mI-\G/\mu+O(\mu^{-2})\big)$. Then
+$\Gmu^{-1}\vd\propto\vd+O(\mu^{-1})$, and after normalising by $\vd\herm\Gmu^{-1}\vd$,
+$\vw\to\vd/M$ as $\mu\to\infty$.
+\end{proof}
+
+\subsection{Front/back ambiguity (Proposition~\ref{prop:frontback})}\label{prf:frontback}
+\begin{proof}
+For $\phi=0^\circ$ and $180^\circ$, $\vu=\pm\mathbf e_x$, so $d_m=e^{\pm j\kappa x_m}$, where
+$x_m$ is mic $m$'s front coordinate. The two vectors agree iff $e^{2j\kappa x_m}=1$ for all
+$m$. The $x_m$ take the values $0$ (mics 0, 1, 4) and $\pm r\cos30^\circ=\pm37.2$\,mm (mics
+5, 6, 2, 3). So the condition is $2\kappa\cdot37.2\,\text{mm}\in2\pi\mathbb Z$, whose smallest
+positive solution is $f^\star=c/(2\cdot0.0372)$.
+\end{proof}
+
+\subsection{COLA and perfect reconstruction (Proposition~\ref{prop:cola})}\label{prf:cola}
+\begin{proof}
+(a) $h[n+N/2]=\sin^2(\pi n/N+\pi/2)=\cos^2(\pi n/N)$, so the sum is $\sin^2+\cos^2=1$.
+
+(b) With $Y=X$, the IFFT returns the windowed frame, and the synthesis window brings the
+total weighting to $g^2=h$. A given sample $x[s]$ lies in exactly two frames, at offsets
+$n$ and $n+H$, so the overlap-add output at $s$ is $(h[n]+h[n+H])\,x[s]=x[s]$ by~(a).
+For timing, see Figure~\ref{fig:buffers}. After frame $t$ is added, the first $H$ entries of
+\code{out_buf} correspond to times $[(t-1)H,tH)$, which is block $t-1$. Those entries now hold
+contributions from both frames covering them ($t-1$ and $t$), so they are complete. Line~106
+emits them, and lines~107--108 shift the buffer and zero the tail for the next call.
+\end{proof}
+
+% =============================================================================
+\section{Symbols}\label{app:symbols}
+% =============================================================================
 \begin{center}\small
 \begin{tabular}{@{}ll@{\qquad}ll@{}}
 \toprule
@@ -992,8 +1264,23 @@ $\vw(f)$ & beamformer weights & $\G,\ \Gmu$ & diffuse coherence, loaded\\
 $\mu$ & diagonal loading & $B(f,\phi)$ & beam pattern $\vw\herm\vd$\\
 $\WNG$ & white-noise gain $1/\|\vw\|^2$ & $\DI$ & diffuse array gain\\
 $g,\ h$ & sine window, periodic Hann & $G$ & output gain $8\cdot2^s$\\
+$c$ & speed of sound (343\,m/s) & $\lambda$ & wavelength $c/f$\\
+$r$ & ring radius (43\,mm) & $d_{ij}$ & distance between mics $i$, $j$\\
+$\vx,\ S,\ \vn$ & mic spectra; talker; noise & $Y$ & beamformer output in one bin\\
+$j$ & imaginary unit, $j^2=-1$ & $\overline{z}$ & complex conjugate\\
+$(\cdot)\tr,\ (\cdot)\herm$ & transpose; conjugate transpose & $\|\vw\|$ & vector length\\
+$\E[\cdot]$ & expected value & $\mI,\ \one$ & identity matrix; all-ones vector\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+% =============================================================================
+\section{Glossary}\label{app:glossary}
+% =============================================================================
+Plain-language definitions of the terms used in this document. The section where each term
+matters most is given in parentheses; click it to jump there. For a gentler introduction to the background terms, see the
+companion document \texttt{beamformer\_background.pdf}.
+
+\input{glossary}
 
 \end{document}
