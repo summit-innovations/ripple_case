@@ -1,0 +1,203 @@
+% =============================================================================
+%  Shared glossary.  \input by beamformer_background.tex and beamformer_math.tex.
+%  Each document defines \glsloc{<label in beamformer_math>} itself:
+%  the main document turns it into a section reference, the background
+%  document ignores it.
+% =============================================================================
+\begin{description}[style=nextline, leftmargin=1.2em, itemsep=3pt, font=\normalfont\bfseries]
+
+\gentry{aliasing}{Aliasing (spatial)}{When the microphones are too far apart compared with the
+  wavelength, two different directions can produce the \emph{same} pattern of phases at the mics,
+  so the array cannot tell them apart. For the UMA-8 this happens between front and back at about
+  4.6\,kHz. It is the spatial version of sampling a signal too slowly in time.\glsloc{sec:aliasing}}
+
+\gentry{amplitude}{Amplitude}{How big a wave's swings are, for example the peak pressure of a sound
+  or the peak value of a digital sample. Doubling the amplitude adds about 6\,dB.}
+
+\gentry{arraygain}{Array gain}{How much better the signal-to-noise ratio is at the beamformer output
+  than at a single microphone, for a given kind of noise. White-noise gain and directivity index are
+  two special cases.\glsloc{sec:das}}
+
+\gentry{azimuth}{Azimuth ($\phi$)}{The horizontal direction a sound comes from, measured as an angle.
+  In this project $\phi=0^\circ$ is the front of the board and positive angles are to the
+  left.\glsloc{sec:geometry}}
+
+\gentry{beampattern}{Beam pattern ($B$)}{A plot of how strongly the beamformer passes sound from
+  each direction at a given frequency. It is $0$\,dB (unchanged) in the look direction and lower
+  elsewhere. Its deep dips are called \emph{nulls}.\glsloc{sec:pattern}}
+
+\gentry{beamformer}{Beamformer}{An algorithm that combines several microphone signals so that
+  sound from one chosen direction is kept and sound from other directions is reduced: an
+  ``acoustic zoom lens''.\glsloc{sec:overview}}
+
+\gentry{bin}{Bin (frequency bin)}{One output of the FFT. Bin $k$ describes the part of the signal
+  near frequency $f_k=k\,f_s/N$. Here the bins are $93.75$\,Hz apart and there are
+  257 of them, from 0 to 24\,kHz.\glsloc{sec:steering}}
+
+\gentry{circconv}{Circular convolution}{What filtering really does when you multiply FFT bins: the
+  part of the filter's response that runs off the end of a frame wraps around to its start. It is
+  usually small, and the window tapers hide most of it.\glsloc{sec:stft}}
+
+\gentry{clipping}{Clipping}{Forcing any sample outside $[-1,1]$ back to $\pm1$. It causes brief
+  distortion when the sound is too loud, but it prevents worse glitches.\glsloc{sec:gain}}
+
+\gentry{coherence}{Coherence ($\Gamma_{ij}$)}{A number between $-1$ and $1$ saying how alike the noise
+  at two microphones is: $1$ means identical, $0$ means unrelated. In diffuse noise, nearby mics at
+  low frequency have coherence close to~1.\glsloc{sec:sd}}
+
+\gentry{cola}{COLA (constant overlap-add)}{A property of a window: copies of it, shifted by the hop
+  size and added together, sum to a constant. It guarantees that chopping a signal into frames and
+  adding them back together returns the original signal.\glsloc{sec:stft}}
+
+\gentry{complex}{Complex number}{A number $a+jb$ with a real part $a$ and an imaginary part $b$, where
+  $j^2=-1$. Draw it as an arrow in a plane. It has a length (magnitude) and an angle (phase).
+  Engineers write $j$ instead of $i$.}
+
+\gentry{cond}{Condition number}{For a matrix, the factor by which a small error in the input can
+  grow in the solution. A value near 1 is perfectly safe, and values like $10^{10}$ mean the answer
+  is dominated by rounding errors and noise.\glsloc{sec:loading}}
+
+\gentry{conjugate}{Conjugate ($\overline{z}$)}{Flip the sign of the imaginary part:
+  $\overline{a+jb}=a-jb$. Geometrically, mirror the arrow across the real axis, which negates its
+  angle. Multiplying by $\overline{e^{j\theta}}=e^{-j\theta}$ undoes a rotation by $\theta$.}
+
+\gentry{herm}{Conjugate transpose ($\mathbf{A}\herm$)}{Transpose a vector or matrix (rows
+  $\leftrightarrow$ columns) \emph{and} conjugate every entry. For vectors, $\vw\herm\vx$ is the
+  complex version of the dot product. Also called the Hermitian transpose.}
+
+\gentry{covariance}{Covariance matrix}{For a vector of random signals, the matrix of average products
+  $\E[V_i\overline{V_j}]$. Its diagonal holds each signal's power and its off-diagonal entries show
+  how related each pair is. Scaling it so the diagonal is~1 gives the coherence
+  matrix.\glsloc{sec:das}}
+
+\gentry{db}{Decibel (dB)}{A logarithmic way to compare two levels. For amplitudes use
+  $20\log_{10}(a_1/a_2)$, and for powers use $10\log_{10}(P_1/P_2)$. $+6$\,dB is about twice the
+  amplitude, $-3$\,dB is half the power, and $0$\,dB means ``unchanged''.}
+
+\gentry{dbfs}{dBFS}{Decibels relative to \emph{full scale}, the loudest value the digital system can
+  represent. $0$\,dBFS is the maximum, so every real signal reads negative.\glsloc{sec:gain}}
+
+\gentry{das}{Delay-and-sum (DAS)}{The simplest beamformer. It undoes each mic's time head start so
+  the target lines up, then averages. It is the best possible design against independent mic
+  self-noise, but it is barely directional when the array is small compared with the
+  wavelength.\glsloc{sec:das}}
+
+\gentry{fft}{DFT / FFT}{The discrete Fourier transform turns a block of $N$ samples into $N$ complex
+  numbers, one per frequency bin, each giving the amplitude and phase of that frequency. The FFT is
+  a fast algorithm for computing it. \code{rfft} is the version for real-valued
+  signals.\glsloc{sec:stft}}
+
+\gentry{loading}{Diagonal loading ($\mu$)}{Adding a small number $\mu$ to every diagonal entry of the
+  noise coherence matrix before designing the weights. It stops the design from amplifying mic
+  self-noise too much. Here $\mu=0.05$.\glsloc{sec:loading}}
+
+\gentry{diffuse}{Diffuse noise field}{Noise that arrives equally from every direction in 3-D, like
+  room reverberation or a crowd of distant talkers. It is the noise the superdirective design is
+  built to reject.\glsloc{sec:sd}}
+
+\gentry{di}{Directivity index (DI)}{The array gain against diffuse noise, in dB: how much the beam
+  favours its look direction over sound arriving from everywhere.\glsloc{sec:das}}
+
+\gentry{distortionless}{Distortionless constraint}{The rule $\vw\herm\vd=1$. Sound from the look
+  direction passes through every frequency bin with gain exactly~1, so the talker's voice is not
+  coloured by the beamformer.\glsloc{sec:das}}
+
+\gentry{farfield}{Far field}{Being far enough from the array that the arriving wavefronts are
+  effectively flat. For this 86\,mm board, anything beyond about an arm's length
+  qualifies.\glsloc{sec:steering}}
+
+\gentry{frame}{Frame}{A short chunk of samples, here $N=512$ (10.7\,ms), that is windowed and
+  sent through the FFT as one unit. Consecutive frames overlap by half.\glsloc{sec:stft}}
+
+\gentry{frequency}{Frequency ($f$)}{How many times per second a wave repeats, in hertz (Hz). Human
+  speech is mostly 100\,Hz--4\,kHz, and hearing extends to about 20\,kHz.}
+
+\gentry{fullscale}{Full scale}{The largest value a digital audio sample can hold. In floating point
+  this program uses $\pm1$.\glsloc{sec:gain}}
+
+\gentry{hann}{Hann window}{A smooth hill-shaped window, $h[n]=\sin^2(\pi n/N)$, that tapers a frame to
+  zero at both ends. Its square root is the sine window.\glsloc{sec:stft}}
+
+\gentry{hermitian}{Hermitian matrix}{A square matrix equal to its own conjugate transpose,
+  $\mathbf{A}=\mathbf{A}\herm$. It is the complex version of a symmetric matrix. Covariance and
+  coherence matrices are always Hermitian.}
+
+\gentry{hop}{Hop size ($H$)}{How many new samples arrive between one frame and the next, here 256.
+  It equals the audio callback size.\glsloc{sec:stft}}
+
+\gentry{latency}{Latency}{The delay between sound reaching the mics and coming out of the
+  headphones. The algorithm adds $H/f_s=5.33$\,ms, and the sound device adds its own
+  buffering.\glsloc{sec:stft}}
+
+\gentry{leakage}{Spectral leakage}{The smearing of one frequency into neighbouring bins that happens
+  when a frame is cut off abruptly. Tapering windows reduce it.\glsloc{sec:stft}}
+
+\gentry{mems}{MEMS microphone}{A tiny microphone etched on a silicon chip (Micro-Electro-Mechanical
+  System), like those in phones. The UMA-8 has seven of them.}
+
+\gentry{mvdr}{MVDR}{Minimum-Variance Distortionless Response: choose the weights that make the
+  output noise as small as possible while keeping the look direction exactly at gain~1. Applied to
+  diffuse noise, it gives the superdirective beamformer.\glsloc{sec:sd}}
+
+\gentry{nyquist}{Nyquist frequency}{Half the sample rate, $f_s/2$, which is 24\,kHz here. It is the
+  highest frequency a sampled signal can represent without aliasing.}
+
+\gentry{omni}{Omnidirectional}{Equally sensitive to sound from every direction. Each MEMS mic on its
+  own is omnidirectional; only combining them makes a beam.}
+
+\gentry{ola}{Overlap-add (OLA)}{Rebuilding a continuous output by adding the processed, overlapping
+  frames back together at their original time positions.\glsloc{sec:stft}}
+
+\gentry{phase}{Phase}{Where a wave is in its cycle, as an angle (one full cycle $=360^\circ=2\pi$
+  radians). A time delay $\tau$ shifts a wave of frequency $f$ by phase
+  $2\pi f\tau$.}
+
+\gentry{phasor}{Phasor}{A complex number $Ae^{j\theta}$ that represents a sinusoid of a single
+  frequency: its length is the amplitude and its angle is the phase. Adding sinusoids of the same
+  frequency is the same as adding their arrows.}
+
+\gentry{planewave}{Plane wave}{A wave whose wavefronts are flat parallel planes, which is a good
+  model for sound from a distant source. All of its arrival-time differences come from the source
+  direction alone.\glsloc{sec:steering}}
+
+\gentry{samplerate}{Sample rate ($f_s$)}{How many samples per second a digital audio system takes,
+  here 48\,000.}
+
+\gentry{selfnoise}{Self-noise}{The faint hiss each microphone and its electronics produce on their
+  own. It is independent from mic to mic, so it is ``white'' noise in the spatial
+  sense.\glsloc{sec:das}}
+
+\gentry{sinewin}{Sine window}{$g[n]=\sin(\pi n/N)$, the square root of the Hann window. This program
+  applies it both before the FFT and after the inverse FFT.\glsloc{sec:stft}}
+
+\gentry{snr}{SNR}{Signal-to-noise ratio: the power of what you want divided by the power of what you
+  don't, usually given in dB.}
+
+\gentry{steering}{Steering vector ($\vd$)}{The list of seven phase factors, one per mic, that a plane
+  wave from a given direction at a given frequency produces. It is the array's ``fingerprint'' for
+  that direction.\glsloc{sec:steering}}
+
+\gentry{stft}{STFT}{Short-time Fourier transform: chop the signal into overlapping windowed frames and
+  FFT each one, which shows how the frequency content changes over time.\glsloc{sec:stft}}
+
+\gentry{superdirective}{Superdirective beamformer}{A beamformer designed to reject diffuse noise.
+  It is far more directional than delay-and-sum on a small array at low frequency, at the cost of
+  amplifying mic self-noise.\glsloc{sec:sd}}
+
+\gentry{unitvector}{Unit vector}{A vector of length 1, used only to indicate a direction. Here $\vu$
+  points from the array toward the source.\glsloc{sec:steering}}
+
+\gentry{wavelength}{Wavelength ($\lambda$)}{The distance between neighbouring wave crests,
+  $\lambda=c/f$. At 1\,kHz in air it is 34\,cm, four times the size of the board.}
+
+\gentry{wavenumber}{Wavenumber ($\kappa$)}{$\kappa=2\pi f/c=2\pi/\lambda$: how many radians of phase a
+  wave accumulates per metre travelled.\glsloc{sec:steering}}
+
+\gentry{wng}{White-noise gain (WNG)}{The array gain against independent mic self-noise. It is
+  $1/\|\vw\|^2$ for a distortionless beamformer. A negative WNG in dB means the beamformer makes the
+  hiss \emph{louder} than a single mic would.\glsloc{sec:das}}
+
+\gentry{window}{Window (function)}{A curve multiplied onto a frame to taper its edges smoothly toward
+  zero, which avoids clicks and spectral leakage.\glsloc{sec:stft}}
+
+\end{description}
